@@ -1,0 +1,718 @@
+import json
+import requests
+import re
+import os
+import glob
+import platform
+
+# Define global variables
+username = ""
+password = ""
+host = "" 
+username = "soar_local_admin"
+password = "s0aring42"
+host = "sor-shw-81a4b7d28dd25a.stg.soar.splunkcloud.com" 
+
+# Disable certificate warnings for self-signed certificates
+requests.packages.urllib3.disable_warnings()
+
+def welcome_page():
+    print("""
+        /////////////////////////////////////////
+        /                                       /
+        /    -=[ SOAR IMPORT/EXPORT TOOL ]=-    /
+        /                                       /
+        /        [O_O]    {^_^}    [x_x]        /
+        /                                       /
+        /        Where Cyber Meets Code         /
+        /         A ToolSkiy Production         /
+        /////////////////////////////////////////""")
+            
+
+    print("This script will allow you to Export/Import information from a Splunk SOAR(AKA phantom) instance.")
+    print()
+    input("Continue...... ")
+
+def ask_host_and_creds():
+    global username, password, host
+    
+    while True:
+        username = input("Enter SOAR Admin username: ")
+        if not username:
+            print("Username cannot be empty.")
+            continue
+        
+        password = input("Enter SOAR Admin password: ")
+        if not password:
+            print("Password cannot be empty.")
+            continue
+
+        raw_host = input("Enter the host: ")
+        validated_host = validate_and_strip(raw_host)
+
+        if validated_host:
+            host = validated_host
+            return
+        else:
+            print("Invalid domain or IP address input. Please try again.")
+
+def validate_api_connection():
+    while True:
+        api_url = f"https://{username}:{password}@{host}/rest/system_info"
+
+        try:
+            response = requests.get(api_url, verify=False)
+            if response.status_code == 200:
+                data = response.json()
+                if 'base_url' in data:
+                    print(f"Credentials are working. Connection to SOAR instance verified. Base Host URL: {data['base_url']}")
+                    return True
+            print(f"Connection to SOAR instance not working. Error Code: {response.status_code}")
+        except requests.RequestException as e:
+            print(f"Error: {e}")
+
+        input("Press Enter to try new credentials...")
+
+def submenuCredsCheckandValidation():
+    while True:
+        if host:
+            print(f"Are we still working with this Host --> {host}")
+            choice = input("(y/n): ")
+            if choice.lower() == 'n':
+                ask_host_and_creds()
+                if not validate_api_connection():
+                    continue
+            elif choice.lower() == 'y':
+                return
+            else:
+                print("Invalid choice. Please select y or n.")
+        else:
+            ask_host_and_creds()
+            if not validate_api_connection():
+                continue
+            else:
+                return
+
+def get_data(api_url):
+    try:
+        response = requests.get(api_url, verify=False)
+        if response.status_code == 200:
+            return response#.json()
+        else:
+            print(f"GET request failed with status code {response.status_code}")
+            print(f"Error {response.json()}") #Print the Json Error too
+            return None
+    except requests.RequestException as e:
+        print(f"GET request error: {e}")
+        return response#.json()
+
+def post_data(api_url, data):
+    #data = json.loads(data)
+    try:
+        response = requests.post(api_url, json=data, verify=False)
+        if response.status_code == 200:
+            return response.json()
+            print(f"POST request was a success")
+        else:
+            print(f"POST request failed with status code {response.status_code}")
+            return response
+    except requests.RequestException as e:
+        print(f"POST request error: {e}")
+        return None
+
+def validate_and_strip(input_string):
+    input_string = input_string.strip()
+    
+    # Remove http or https if present
+    if input_string.startswith("https://"):
+        input_string = input_string[len("https://"):]
+    elif input_string.startswith("http://"):
+        input_string = input_string[len("http://"):]
+
+    # Check for localhost
+    if input_string == "localhost":
+        return input_string
+
+    # Check for valid IP address
+    ip_pattern = r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$'
+    if re.match(ip_pattern, input_string):
+        return input_string
+
+    # Validate domain
+    domain_pattern = r'^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$'
+    if re.match(domain_pattern, input_string):
+        return input_string
+    else:
+        return None
+
+
+def create_file(data, file_name, file_type):
+    try:
+        # Extract folder name from file_name
+        folder_name = file_name.split(" - ")[0]
+
+        # Get the directory where the script is located
+        script_directory_ExportParent = os.path.dirname(os.path.abspath(__file__))
+        
+        # Create the sub folder if it does not exist
+        script_directory_ExportChild = os.path.join(script_directory_ExportParent, "SOAR Export Files")
+        if not os.path.exists(script_directory_ExportChild):
+            os.makedirs(script_directory_ExportChild)
+
+        # Create the sub folder if it does not exist
+        new_folder_path = os.path.join(script_directory_ExportChild, folder_name)
+        if not os.path.exists(new_folder_path):
+            os.makedirs(new_folder_path)
+        
+        # Construct the file path for saving the JSON data in the new folder
+        file_path = os.path.join(new_folder_path, f"{file_name}{file_type}")
+        
+        
+        # Save the data to the file in the new folder
+        if file_type == ".json":
+            with open(file_path, "w") as export_file:
+                json.dump(data, export_file, indent=4)
+        elif file_type == ".tgz":
+            with open(file_path, 'wb') as f:
+                f.write(data.content)
+        
+        print(f"JSON was saved to the following directory: {file_path}")
+    except IOError as e:
+        print(f"Error saving JSON file: {e}")
+
+    
+    
+def is_number(string):
+    try:
+        float(string)
+        return True
+    except ValueError:
+        return False
+    
+def RequestSingleWorkbook(WB_Template_ID, WB_Details):
+    Cmd = f"workbook_phase_template?_filter_template={WB_Template_ID}"
+
+    # Construct the url for what we are looking for
+    api_url = f"https://{username}:{password}@{host}/rest/{Cmd}"
+    #api_url = f"https://soar_local_admin:s0aring42@sor-shw-270f21b9e81f49.stg.soar.splunkcloud.com/rest/workbook_phase_template?_filter_template={WB_Template_ID}"
+
+    # Making the GET request
+    get_response = (get_data(api_url)).json()
+    if get_response:
+        if get_response['count'] == 0:
+            print(f"Something went wrong. Try confirming that the workbook ID exists") 
+            
+        else:           
+            
+            #Create the File name
+            if WB_Details:                
+                WB_Template_Name = WB_Details['name']
+                WB_Template_isdefault = WB_Details['is_default']
+                WB_Template_Description = WB_Details['description']
+                WB_Template_isnoterequired = WB_Details['is_note_required']
+                
+                FileName = f"workbook_template_export - {WB_Template_Name}"                
+            else: #if no name exists then go grab one
+                Cmd = f"workbook_template?_filter_id={WB_Template_ID}"                 
+                api_url = f"https://{username}:{password}@{host}/rest/{Cmd}" # Construct the url for what we are looking for
+                get_workbookinfo = (get_data(api_url)).json() # Making the GET request
+                #print(f"Raw Data: {get_workbookinfo['data']}")
+                #print(f"Raw Data: {get_response['data']}")
+                WB_Template_Name = get_workbookinfo['data'][0]['name']
+                WB_Template_isdefault = get_workbookinfo['data'][0]['is_default']
+                WB_Template_Description = get_workbookinfo['data'][0]['description']
+                WB_Template_isnoterequired = get_workbookinfo['data'][0]['is_note_required']
+                FileName = f"workbook_template_export - {WB_Template_Name}"
+                
+            response = f"{get_response['count']} Phases where exported from WorkBook ID - {WB_Template_ID}: {WB_Template_Name}"
+                
+            # Add 'name' and is_default to the begining of the json to store
+            get_response = {'name': WB_Template_Name, 
+                'is_default': WB_Template_isdefault, 
+                'description': WB_Template_Description, 
+                'is_note_required': WB_Template_isnoterequired,
+                **get_response}
+            
+            #print(f"Raw Data after changes: {get_response}")
+            
+            create_file(get_response, FileName, ".json") #Last perameter is file type
+            return response
+            
+def RequestAllSpecificData(Cmd, DataType, KeyWordForName):
+    # Construct the url for what we are looking for
+    api_url = f"https://{username}:{password}@{host}/rest/{Cmd}"
+    
+    # Making the GET request
+    get_response = (get_data(api_url)).json()
+
+    #print(f"Raw Data - for {DataType}: {get_response}") 
+    
+    if get_response:
+        isResponseHaveValues = is_valid_json_With_Values(get_response)
+        ResultCount = get_response.get("count", "") #Get the Key named 'count' or return "" if one doesnt exist. This ensures nothing breaks
+        if isResponseHaveValues and ResultCount == 0:
+            print(f"Something went wrong getting all the available data for - {DataType}.") 
+            print(f"Error String: {get_response}")
+            input("Continue.....")
+        elif isResponseHaveValues and ResultCount == "": #In the case that thier is no count in the JSON string so we save it all as one file
+            print(f" ~~~~{DataType}s found~~~~ ")
+            FileName = f"{DataType}_export - All in one"
+            if get_response.get(KeyWordForName, ""): #Only get the data you need if it is available.
+                get_response = {KeyWordForName: get_response[KeyWordForName]} #This helps us retain the key with the values instead of just the values
+            create_file(get_response, FileName, ".json") #Last perameter is file type               
+            input("Continue.....")   
+        elif isResponseHaveValues and ResultCount != 0:
+            
+            dataItems = [item for item in get_response['data']]
+            print(f" ~~~~{DataType}s found~~~~ ")
+            
+            for Eachitem in dataItems:
+                print(f"{DataType}: {Eachitem[KeyWordForName]}")
+                JsonToStore = Eachitem
+                FileName = f"{DataType}_export - {Eachitem[KeyWordForName]}"
+                create_file(JsonToStore, FileName, ".json") #Last perameter is file type               
+                
+                print("-----------------------------------------------")
+            
+            input("Continue.....")     
+        else:
+            print(f"Something went wrong getting all the available data for - {DataType}.") 
+            print(f"Looks like Valid a VALID JSON string was not returned") 
+            print(f"Error String: {get_response}")   
+            input("Continue.....")       
+
+def Export_Playbooks_and_CustomFunctions(Cmd, DataType):
+    # Construct the url 
+    api_url = f"https://{username}:{password}@{host}/rest/{Cmd}"
+    
+    # Making the GET request to get all IDs first
+    get_response = (get_data(api_url)).json()
+
+    #print(f"Raw Data - for {DataType}: {get_response}") 
+    
+    if get_response:
+        ResultCount = get_response.get("count", "") #Get the Key named 'count' or return "" if one doesnt exist. This ensures nothing breaks
+        if ResultCount == 0:
+            print(f"Something went wrong getting all the available data for - {DataType}.") 
+            print(f"Error String: {get_response}")
+            input("Continue.....")
+        else:
+            dataItems = [item for item in get_response['data']]
+            print(f" ~~~~{DataType}s found~~~~ ")
+            
+            for Eachitem_Json in dataItems:
+                id = Eachitem_Json['id']
+                print(f"{DataType}: {Eachitem_Json['name']} - ID:{id}")
+                #print(f"Raw: {Eachitem_Json}")                
+                FileName = f"{DataType}_export - {Eachitem_Json['name']}"
+                Cmd = f"{DataType}/{id}/export"
+                #Cmd = f"custom_function/1/export"
+                # Construct the url 
+                api_url = f"https://{username}:{password}@{host}/rest/{Cmd}"
+            
+                # Making the GET request to get all IDs first
+                get_response = get_data(api_url)
+                #print(f"Raw TGZ: {get_response.content}")
+                create_file(get_response, FileName, ".tgz") #Last perameter is file type               
+                
+                print("-----------------------------------------------")
+            
+            input("Continue.....")     
+        
+           
+def RequestAllWorkbooks():
+    #This will only grab all the workbook template names and IDs
+    #This info is then passed to the RequestSingleWorkbook() where only IDs are used
+    
+    #Grab all the Available workbook IDs first
+    Cmd = "workbook_template?page_size=0" # page zero indicates all pages Refrence: https://docs.splunk.com/Documentation/SOARonprem/6.1.1/PlatformAPI/RESTQueryData
+
+    # Construct the url for what we are looking for
+    api_url = f"https://{username}:{password}@{host}/rest/{Cmd}"
+    
+    # Making the GET request
+    get_response = (get_data(api_url)).json()
+
+    if get_response:
+        if get_response['count'] == 0:
+            print(f"Something went wrong getting all the available workbook templates.") 
+            print(f"Error String: {get_response}")
+            input("Continue.....")
+            
+        else:
+            #print(f"Raw Data: {get_response['data']}")
+            Workbook_list = [item for item in get_response['data']]
+            id_list = [item['id'] for item in get_response['data']] #Get a list of all availble IDs
+            print(f" ~~~~Workbook Templates found~~~~ ")
+            name_list = [item['name'] for item in get_response['data']]
+            
+            for worbook in Workbook_list:
+                print(f"Imported Workbook template: {worbook['name']}")
+                #print(f"Raw Data: {worbook}")
+                RequestSingleWorkbook(worbook['id'], worbook) 
+                print(f"-----------------------------------------------")
+            
+                
+        
+        response = f"Found and imported {len(id_list)} Workbook Templates"
+        return response 
+        
+                
+
+def export_submenu():
+    submenuCredsCheckandValidation()
+    clear_console()
+    print("Export Menu:")
+    print("1. Export Workbook Templates")
+    print("2. Export Users, Roles, & Permissions")
+    print("3. Export Settings")
+    print("4. Export Playbooks & Custom Functions")
+    print("5. Export All of the Above")
+    choice = input("Enter your choice: ")
+    clear_console()
+    
+    if choice == "1":
+        Options_ExportWorkbooks()            
+    elif choice == "2":
+        Option_ExportAllUsersAndRoles()
+    elif choice == "3":
+        Option_ExportAllSettings()
+        
+    elif choice == "4":
+        Option_ExportAllPlaybooksAndCF()
+    
+    elif choice == "5":
+        Options_ExportWorkbooks()
+        Option_ExportAllUsersAndRoles()
+        Option_ExportAllSettings()
+        Option_ExportAllPlaybooksAndCF()
+        
+    elif choice == "6":
+        print("Exporting a BACKUP of All Cases...")
+        #Maybe this will be created in the future
+        #Cmd = "severity?page_size=0"
+        #RequestAllSpecificData(Cmd, "severity", "name") #command, DataType, Keyword for name
+        
+    else:
+        print("Invalid choice. Please select a valid option.")
+        
+def Options_ExportWorkbooks():
+    print("Ok, Lets Export the Workbook Templates...")
+    WB_Template_Response = input("Enter the WorkBook Template ID (or 'all'): ")
+    
+    if WB_Template_Response.lower() == "all":
+        response = RequestAllWorkbooks()
+        print(f"{response}")
+        input("Continue.....")
+    elif is_number(WB_Template_Response):
+        response = RequestSingleWorkbook(WB_Template_Response, "")
+        print(f"{response}")
+        input("Continue.....")
+
+def Option_ExportAllUsersAndRoles():
+    print("Exporting all User Roles & Permissions...")
+                
+    #Users
+    Cmd = "ph_user?page_size=0" # page zero indicates all pages Refrence: https://docs.splunk.com/Documentation/SOARonprem/6.1.1/PlatformAPI/RESTQueryData
+    RequestAllSpecificData(Cmd, "user", "username") #command, DataType, Keyword for name
+    
+    #Roles
+    Cmd = "role?page_size=0" # page zero indicates all pages Refrence: https://docs.splunk.com/Documentation/SOARonprem/6.1.1/PlatformAPI/RESTQueryData
+    RequestAllSpecificData(Cmd, "role", "name") #command, DataType, Keyword for name
+    
+def Option_ExportAllPlaybooksAndCF():
+    print("Exporting Custom Functions...")
+    #clear_console()
+    Cmd = "custom_function?page_size=0"
+    Export_Playbooks_and_CustomFunctions(Cmd, "custom_function") 
+    
+    print("Exporting Playbooks...")
+    #clear_console()
+    Cmd = "playbook?page_size=0"
+    Export_Playbooks_and_CustomFunctions(Cmd, "playbook") #command, DataType
+    
+def Option_ExportAllSettings():
+    print("Exporting Case Statuses...")
+    Cmd = "container_status?page_size=0" # page zero indicates all pages Refrence: https://docs.splunk.com/Documentation/SOARonprem/6.1.1/PlatformAPI/RESTQueryData
+    RequestAllSpecificData(Cmd, "container_status", "name") #command, DataType, Keyword for name
+    
+    clear_console()
+    print("Exporting Severitys...")
+    Cmd = "severity?page_size=0"
+    RequestAllSpecificData(Cmd, "severity", "name") #command, DataType, Keyword for name
+    
+    clear_console()
+    print("Exporting Tags...") ##TODO Will need to be done by pulling Container_Options - Importing will need a container created then deleted.
+    Cmd = "container_options/tags"
+    RequestAllSpecificData(Cmd, "tags", "tags") #command, DataType, Keyword for name
+    
+    clear_console()
+    print("Exporting Labels...") ##TODO Will need to be done by pulling Container_Options
+    Cmd = "container_options/label"
+    RequestAllSpecificData(Cmd, "label", "label") #command, DataType, Keyword for name
+    
+    clear_console()
+    print("Exporting CEFs...") 
+    Cmd = "cef?_filter_type=\"custom\"&page_size=0"
+    RequestAllSpecificData(Cmd, "cef", "name") #command, DataType, Keyword for name
+    
+    #clear_console()
+    #print("Exporting Custome Fields...") 
+    #Cmd = "cef?_filter_type=\"custom\"&page_size=0"
+    #RequestAllSpecificData(Cmd, "cef", "name") #command, DataType, Keyword for name
+    
+    clear_console()
+    print("Exporting Container Options...") 
+    Cmd = "container_options"
+    RequestAllSpecificData(Cmd, "container_options", "") #command, DataType, Keyword for name
+    
+    clear_console()
+    print("Exporting HUD...") 
+    Cmd = "container_pin_settings?page_size=0"
+    RequestAllSpecificData(Cmd, "HUD", "id") #command, DataType, Keyword for name
+    
+    clear_console()
+    print("Exporting all other settings ...") 
+    Cmd = "system_settings"
+    RequestAllSpecificData(Cmd, "system_settings", "name") #command, DataType, Keyword for name
+        
+def import_Import_Workbook_Template():
+    while True:
+            # Get the directory where the script is located
+            current_directory = os.path.dirname(os.path.abspath(__file__))
+            SearchKeyword = "workbook_template_export"
+            found_files = find_files_to_import(SearchKeyword, current_directory)
+
+            if not found_files:
+                print("No files with 'workbook' in the title found in the current directory.")
+                change_directory = input("Enter a different directory to search or press Enter to exit: ")
+                #This ensure that a new director was typed in
+                if not change_directory:
+                    break
+                else:
+                    current_directory = change_directory
+                    continue
+
+            selected_file = select_file_from_list(found_files)
+
+            if selected_file:
+                print(f"You selected '{selected_file}' to be imported.")
+                #Convert the file we exported priviasly into an import JSON Format
+                with open(f'{selected_file}', 'r') as json_file:
+                    # Parse the JSON data into a Python dictionary
+                    RAW_JSONdata = json.load(json_file)
+                    output_json = convert_exported_workbook_into_importable_workbook_JSON(RAW_JSONdata)                 
+                    
+                    
+                    
+                    # Construct the mission info string
+                    api_url = f"https://{username}:{password}@{host}/rest/workbook_template"
+                    response = post_data(api_url, output_json)
+                    #print(response)
+                    input("Continue........")
+                    break
+            else:
+                new_location = input("Enter a different file location or press Enter to exit: ")
+                if new_location:
+                    selected_file = os.path.join(new_location, "workbook.json")
+                    print(f"You chose to work with '{selected_file}'.")
+                else:
+                    break
+        
+def import_submenu():
+    submenuCredsCheckandValidation()
+    clear_console()
+    print("Import Menu:")
+    print("1. Import Workbook Templates")
+    print("2. Import Users, Roles, & Permissions")
+    print("3. Import Settings")
+    print("4. Import Playbooks & Custom Functions")
+    print("5. Import All of the Above")
+    choice = input("Enter your choice: ")
+    clear_console()
+    
+    if choice == "1":
+        print("Importing Workbook Template...")        
+        import_Import_Workbook_Template()
+    elif choice == "2":
+        print("Importing User Roles & Permissions...")
+        # Add import logic for User Roles & Permissions here
+    elif choice == "3":
+        print("Importing Case Status Labels...")
+        # Add import logic for Case Status Labels here
+    elif choice == "4":
+        print("Importing Users...")
+        # Add import logic for Users here
+    elif choice == "5":
+        print("Importing All of the Above...")
+        # Add import logic for all items here
+    else:
+        print("Invalid choice. Please select a valid option.")
+
+
+def main_menu():
+    while True:
+        clear_console()
+        print("Main Menu:")
+        print("1. Export")
+        print("2. Import")
+        print("3. Exit")
+        choice = input("Enter your choice: ")
+        clear_console()
+        
+        if choice == "1":
+            export_submenu()
+        elif choice == "2":
+            import_submenu()
+        elif choice == "3":
+            print("Exiting the program.")
+            break
+        else:
+            print("Invalid choice. Please select a valid option.")
+            
+def find_files_to_import(Search_Keyword, directory):
+    # Initialize a list to store matching file paths
+    matching_files = []
+
+    # Recursively search for matching files in subdirectories
+    for root, _, files in os.walk(directory):
+        for filename in files:
+            if filename.startswith(Search_Keyword):
+                # Construct the full path to the matching file
+                file_path = os.path.join(root, filename)
+                matching_files.append(file_path)
+
+    return matching_files
+
+
+    #json_files = glob.glob(os.path.join(directory, f"*{type}*.json"))
+    #return json_files
+
+def is_valid_json_With_Values(data):
+    return isinstance(data, dict) and len(data) >= 1
+
+def clear_console():
+    if platform.system() == 'Windows':
+        os.system('cls')
+    else:
+        os.system('clear')
+
+def select_file_from_list(file_list):
+    print("Select a JSON file to work with:")
+    for i, file_path in enumerate(file_list):
+        print(f"{i + 1}: {os.path.basename(file_path)}")
+    
+    while True:
+        try:
+            choice = int(input("Enter the number of your choice ('0' to exit | or sellect 'all'): "))
+            if 0 <= choice <= len(file_list):
+                return file_list[choice - 1] if choice > 0 else None
+            elif choice.lower() == 'all'
+            else:
+                print("Invalid choice. Please enter a valid number.")
+        except ValueError:
+            print("Invalid input. Please enter a number.")
+            
+def convert_exported_workbook_into_importable_workbook_JSON(input_json):
+    
+    # Parse the input JSON
+    data = input_json
+
+    Template_name = data["name"]
+    Template_isdefault = data["is_default"]
+    Template_description = data["description"] 
+    Template_isnoterequired = data["is_note_required"]
+    
+    # Initialize the output structure
+    output_data = {
+        "name": Template_name,
+        "description": Template_description,
+        "is_default": Template_isdefault,
+        "is_note_required": Template_isnoterequired,
+        "phases": []
+    }
+
+    # Loop through the phases in the input JSON and transform them
+    for phase in data["data"]:
+        phase_name = phase["name"]
+        phase_order = phase["order"]
+        phase_tasks = phase["tasks"]
+        phase_sla = phase["sla"]
+        phase_sla_type = phase["sla_type"]
+        
+
+        # Initialize the phase structure for the output
+        phase_data = {
+            "name": phase_name,
+            "order": phase_order,
+            "sla": phase_sla,
+            "sla_type": phase_sla_type,
+            "tasks": []
+        }
+
+        # Loop through the tasks in the phase and transform them
+        for task in phase_tasks:
+            task_name = task["name"]
+            task_order = task["order"]
+            task_description = task["description"]
+            task_owner = task["owner"]
+            task_role = task["role"]
+            task_is_note_required = task["is_note_required"]
+            task_sla = task["sla"]
+            task_sla_type = task["sla_type"]
+            task_suggestions = task["suggestions"]
+            task_actions = task_suggestions.get("actions", [])
+            task_playbooks = task_suggestions.get("playbooks", [])
+            
+
+            # Initialize the task structure for the output
+            task_data = {
+                "name": task_name,
+                "order": task_order,
+                "description": task_description,
+                "owner": task_owner,
+                "role": task_role,
+                "is_note_required": task_is_note_required,
+                "sla": task_sla,
+                "sla_type": task_sla_type                
+            }
+            
+            #only add it if there are actions
+            if task_actions:
+                task_data["actions"] = task_actions
+            
+            #only add it if there are playbooks
+            if task_playbooks:
+                playbooksList = []
+                # Loop through the task playbooks
+                for playbook in task_playbooks:
+                    playbook_scm = playbook["scm"]
+                    playbook_name = playbook["playbook"]
+                    
+                    # Initialize the playbook structure for the output
+                    playbook_data = {
+                        "scm": playbook_scm,
+                        "playbook": playbook_name
+                    }
+                    
+                    # Add the task to the phase
+                    playbooksList.append(playbook_data)
+                    task_data["playbooks"] = playbooksList
+
+            # Add the task to the phase
+            phase_data["tasks"].append(task_data)
+
+        # Add the phase to the output
+        output_data["phases"].append(phase_data)
+
+    # Convert the output data to JSON format
+    output_json = output_data #json.loads(output_data)
+    print("File successfully converted to readable input file!")
+    #print(output_json)
+    return output_json
+
+
+if __name__ == "__main__":
+    welcome_page()  # Display the welcome message
+    main_menu()
+
