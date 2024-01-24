@@ -15,9 +15,9 @@ import base64
 username = ""
 password = ""
 host = "" 
-#username = "soar_local_admin"
-#password = "s0aring42"
-#host = "sor-shw-81a4b7d28dd25a.stg.soar.splunkcloud.com" 
+#username = ""
+#password = ""
+#host = "" 
 
 # Disable certificate warnings for self-signed certificates
 requests.packages.urllib3.disable_warnings()
