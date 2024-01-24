@@ -1,38 +1,13 @@
-# SOAR-Import-Export-ToolSkiy
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Splunk SOAR Import/Export Tool README</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        .container {
-            width: 80%;
-            margin: auto;
-        }
-        h1, h2, h3 {
-            color: #333;
-        }
-        code {
-            background-color: #f4f4f4;
-            padding: 2px 5px;
-            border-radius: 3px;
-            font-family: monospace;
-        }
-        pre {
-            background-color: #f4f4f4;
-            padding: 10px;
-            border-radius: 5px;
-            font-family: monospace;
-        }
-    </style>
+
 </head>
 <body>
     <div class="container">
-        <h1>Splunk SOAR Import/Export Tool</h1>
+        <h1>Splunk SOAR Import/Export ToolSkiy</h1>
         <h2>Description</h2>
         <p>This Python script provides a convenient way to export and import configurations and data between Splunk SOAR instances. It includes functionalities like exporting and importing workbook templates, user roles, permissions, and system settings, among others.</p>
         <h2>Features</h2>
@@ -73,7 +48,7 @@
         <h2>Disclaimer</h2>
         <p>This tool is not officially associated with Splunk. Please use it at your own risk.</p>
         <h2>Support</h2>
-        <p>For support, please raise an issue in the GitHub repository or contact the maintainers.</p>
+        <p>For support, please raise an issue in the GitHub repository or contact Igor.</p>
     </div>
 </body>
 </html>
