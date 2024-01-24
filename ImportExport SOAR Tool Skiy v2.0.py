@@ -6,7 +6,6 @@ import os
 import platform
 import base64
 
-##TODO: The settings should be broken out into their own options.
 ##TODO: If something already exists the user should have an option to overwrite it.
 ##TODO: Colors for Success or fail msgs
 ##TODO: Backup All Cases
