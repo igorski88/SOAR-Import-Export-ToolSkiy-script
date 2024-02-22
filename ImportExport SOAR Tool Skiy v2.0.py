@@ -2,7 +2,6 @@ import json
 import requests
 import re
 import os
-#import glob
 import platform
 import base64
 
