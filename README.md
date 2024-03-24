@@ -7,7 +7,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Splunk SOAR Import/Export ToolSkiy</h1>
+        <h1>Splunk SOAR Import/Export ToolSkiy (Script)</h1>
         <h2>Description</h2>
         <p>This Python script provides a convenient way to export and import configurations and data between Splunk SOAR instances. It includes functionalities like exporting and importing workbook templates, user roles, permissions, and system settings, among others.</p>
         <h2>Features</h2>
