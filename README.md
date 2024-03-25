@@ -48,7 +48,7 @@
         <h2>Disclaimer</h2>
         <p>This tool is not officially associated with Splunk. Please use it at your own risk.</p>
         <h2>Support</h2>
-        <p>For support, please raise an issue in the GitHub repository or contact Igor.</p>
+        <p>For support, please raise an issue in the GitHub repository.</p>
     </div>
 </body>
 </html>
