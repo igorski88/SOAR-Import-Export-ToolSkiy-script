@@ -433,14 +433,14 @@ def export_submenu():
         print("Exporting HUD...") 
         Cmd = "container_pin_settings?page_size=0"
         RequestAllSpecificData(Cmd, "HUD", "id") #command, DataType, Keyword for name
- 
-        print("Exporting Custom Functions...")
-        Cmd = "custom_function?page_size=0"
-        Export_Playbooks_and_CustomFunctions(Cmd, "custom_function") 
- 
+
         print("Exporting Playbooks...")        
         Cmd = "playbook?page_size=0"
         Export_Playbooks_and_CustomFunctions(Cmd, "playbook") #command, DataType
+
+        print("Exporting Custom Functions...")
+        Cmd = "custom_function?page_size=0"
+        Export_Playbooks_and_CustomFunctions(Cmd, "custom_function")
 
         print("Exporting all other settings ...") 
         Cmd = "system_settings"
@@ -479,13 +479,13 @@ def export_submenu():
         Cmd = "container_pin_settings?page_size=0"
         RequestAllSpecificData(Cmd, "HUD", "id") #command, DataType, Keyword for name
     elif choice == "9":
-        print("Exporting Custom Functions...")
-        Cmd = "custom_function?page_size=0"
-        Export_Playbooks_and_CustomFunctions(Cmd, "custom_function") 
-    elif choice == "10":
         print("Exporting Playbooks...")        
         Cmd = "playbook?page_size=0"
         Export_Playbooks_and_CustomFunctions(Cmd, "playbook") #command, DataType
+    elif choice == "10":
+        print("Exporting Custom Functions...")
+        Cmd = "custom_function?page_size=0"
+        Export_Playbooks_and_CustomFunctions(Cmd, "custom_function") 
     elif choice == "11":
         print("Exporting all other settings ...") 
         Cmd = "system_settings"
