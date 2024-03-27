@@ -24,10 +24,12 @@
         <p>2. Navigate to the script's directory:</p>
         <pre><code>cd &lt;script_directory&gt;</code></pre>
         <p>3. Install required dependencies (optional):</p>
+        <p>**If you run this script on the SOAR instance you are exporting/importing from, the envirment already has all the requiered dependencies.</p>
         <pre><code>pip install -r requirements.txt</code></pre>
         <h2>Usage</h2>
         <p>Run the script using Python:</p>
         <pre><code>python &lt;script_name&gt;.py</code></pre>
+        <p><strong>**Please ensure you're using Python 3 or a newer version.</strong> SOAR instance install locations may vary; in my case, Python was located at: "/opt/soar/usr/python39/bin/python3.9".</p>
         <p>Follow the on-screen prompts to select between export and import functionalities.</p>
         <h3>Exporting Data</h3>
         <ol>
