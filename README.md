@@ -24,7 +24,7 @@
         <p>2. Navigate to the script's directory:</p>
         <pre><code>cd &lt;script_directory&gt;</code></pre>
         <p>3. Install required dependencies (optional):</p>
-        <p>**If you run this script on the SOAR instance you are exporting/importing from, the envirment already has all the requiered dependencies.</p>
+        <p>**If you are executing this script directly on the SOAR instance that environment already includes all necessary dependencies.</p>
         <pre><code>pip install -r requirements.txt</code></pre>
         <h2>Usage</h2>
         <p>Run the script using Python:</p>
